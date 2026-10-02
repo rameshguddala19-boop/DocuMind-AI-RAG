@@ -1,43 +1,45 @@
-# 📚 DocuMind AI RAG
+# 📚 DocuMind AI
 
-DocuMind AI RAG is a document-based question answering application that allows users to upload a PDF and ask questions based only on the currently active document.
+**DocuMind AI** is a document-based **Retrieval-Augmented Generation (RAG)** application that allows users to upload a PDF and ask questions based only on the currently active document.
 
 ## 🎯 Project Goal
 
-The main goal of this project is to build a reliable RAG (Retrieval-Augmented Generation) system that:
+The goal of this project is to build a reliable RAG system that:
 
-* Accepts a PDF document from the user
-* Extracts text from the PDF
-* Splits the document into meaningful chunks
-* Creates embeddings for the chunks
-* Stores the embeddings in a vector database
-* Retrieves relevant chunks for each question
-* Generates answers using the retrieved document context
-* Prevents information from an old PDF from affecting a newly uploaded PDF
+- Accepts a PDF document
+- Extracts text from the document
+- Splits the document into chunks
+- Creates embeddings for the chunks
+- Stores embeddings in ChromaDB
+- Retrieves relevant chunks for each question
+- Generates answers using the retrieved context
+- Removes old document chunks when a new PDF is processed
 
 ## 🔄 How It Works
 
 ```text
 PDF Upload
     ↓
-Extract Text
+Text Extraction
     ↓
-Split into Chunks
+Document Chunking
     ↓
-Generate Embeddings
+Embedding Generation
     ↓
-Store in Chroma
+ChromaDB Vector Storage
     ↓
 User Question
     ↓
-Retrieve Relevant Chunks
+Similarity Search
     ↓
-Generate Answer
+Relevant Context
+    ↓
+Answer Generation
 ```
 
 ## 🧠 RAG Pipeline
 
-The application follows these main steps:
+The application follows these steps:
 
 1. PDF Upload
 2. Text Extraction
@@ -50,29 +52,43 @@ The application follows these main steps:
 
 ## 📄 Active Document Handling
 
-The application is designed to work with one active PDF at a time.
+DocuMind AI works with **one active PDF at a time**.
 
-When a new PDF is uploaded:
+When a new PDF is processed:
 
-* The previous document's indexed chunks are removed.
-* The new PDF is processed.
-* New chunks are created and indexed.
-* Questions are answered using the currently active document.
+- Existing document chunks are removed.
+- The new PDF is processed.
+- New chunks are created.
+- New embeddings are stored in ChromaDB.
+- Questions are answered using the current PDF.
 
-This prevents stale information from previously uploaded documents from being used in new answers.
+This prevents information from a previously processed PDF from affecting answers for the new document.
 
 ## ✂️ Chunking
 
-The document is divided into chunks before embedding.
+The application uses recursive text splitting for general PDF documents.
 
-Current chunking configuration:
+Current configuration:
 
-* Chunk size: `800`
-* Chunk overlap: `120`
+- Chunk size: `800`
+- Chunk overlap: `100`
 
-Separators are used to preserve meaningful text boundaries where possible.
+Employee-data PDFs are handled as individual employee records so that employee-specific questions can be answered more precisely.
 
-## 🗂️ Project Structure
+## 🛠️ Technologies Used
+
+- Python
+- Streamlit
+- Retrieval-Augmented Generation (RAG)
+- ChromaDB
+- Ollama
+- Llama 3.2
+- Nomic Embed Text
+- PyPDF
+- LangChain
+- Vector Similarity Search
+
+## 📁 Project Structure
 
 ```text
 RAG_project/
@@ -81,29 +97,13 @@ RAG_project/
 ├── advanced_rag.py
 ├── config.py
 ├── prepare_data.py
-├── rag.db
+├── README.md
+├── .gitignore
 │
 ├── documents/
 ├── data/
-├── chroma_store/
-├── live_dynamic_rag/
-│
-├── .env
-├── .gitignore
-└── README.md
+└── chroma_store/
 ```
-
-## 🛠️ Technologies Used
-
-* Python
-* Streamlit
-* RAG
-* ChromaDB
-* PDF text extraction
-* Embeddings
-* Vector similarity search
-* SQLite
-* Ollama
 
 ## ▶️ Run the Project
 
@@ -119,63 +119,82 @@ Start the Streamlit application:
 python -m streamlit run app.py
 ```
 
-Then open the local Streamlit URL shown in the terminal.
+The terminal will display the local Streamlit URL.
 
-## 💬 Example Usage
-
-1. Open the application.
-2. Upload a PDF.
-3. Wait until the document is indexed.
-4. Ask a question about the uploaded PDF.
-5. The application retrieves relevant chunks.
-6. The answer is generated from the active document.
-
-## 🔍 Example Questions
+## 💬 Example Questions
 
 For an employee information PDF:
 
 ```text
-What is the casual leave policy?
-Who has the highest salary in Hyderabad?
-Which employee works as a Product Manager?
+What is the salary of EMP001?
+How much does EMP001 earn?
+Give me who are working in Hyderabad.
+What is the manager of EMP001?
+What department does EMP001 work in?
 ```
 
-For another PDF, questions should be based only on that newly uploaded document.
-
-## 🛡️ Important RAG Behavior
-
-The application should not answer a question using chunks belonging to a previously uploaded PDF.
-
-For example:
+For a general document:
 
 ```text
-PDF 1 → Upload → Index → Ask Questions
+What should happen when a user enters valid credentials?
+What is the purpose of the login functionality?
+```
 
-PDF 2 → Upload
-       ↓
-Remove PDF 1 chunks
-       ↓
-Index PDF 2
-       ↓
-Ask Questions
-       ↓
+## 🛡️ RAG Behavior
+
+DocuMind AI is designed to answer questions using the currently active document.
+
+Example:
+
+```text
+PDF 1
+  ↓
+Process
+  ↓
+100 chunks
+
+
+PDF 2
+  ↓
+Process
+  ↓
+Remove old chunks
+  ↓
+Create new chunks
+  ↓
+5 chunks
+  ↓
+Ask questions
+  ↓
 Answer only from PDF 2
 ```
 
+This prevents stale information from previously processed documents from being retrieved.
+
 ## 🧪 Testing
 
-The application can be tested by uploading multiple PDFs one after another and asking document-specific questions.
+The application was tested with:
 
-A successful test should confirm that:
+- Employee PDF containing 100 employee records
+- QA RAG test PDF containing 5 chunks
+- Repeated questions
+- Different wording for the same question
+- Location-based employee queries
+- Switching from one PDF to another
 
-* The new PDF is indexed correctly.
-* Old document chunks are removed.
-* Retrieved chunks belong to the active PDF.
-* Answers are based on the current document.
-* Previous PDF information does not appear in the answer.
+Example:
+
+```text
+Employee PDF
+→ 100 chunks
+
+QA PDF
+→ old 100 chunks removed
+→ 5 new chunks indexed
+```
+
+Repeated factual questions also return consistent answers.
 
 ## 👨‍💻 Author
 
-Ramesh Guddala
-
-
+**Ramesh Guddala**
