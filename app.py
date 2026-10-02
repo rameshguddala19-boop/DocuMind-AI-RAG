@@ -44,68 +44,57 @@ with st.sidebar:
 
     st.header("📂 Document Upload")
 
-    uploaded_files = st.file_uploader(
-        "Upload PDF files",
+    uploaded_file = st.file_uploader(
+        "Upload PDF file",
         type=["pdf"],
-        accept_multiple_files=True
+        accept_multiple_files=False
     )
 
-    if uploaded_files:
+    if uploaded_file:
 
         st.write(
-            f"Selected: {len(uploaded_files)} PDF(s)"
+            f"Selected: {uploaded_file.name}"
         )
 
         if st.button(
-            "🚀 Process Documents",
+            "🚀 Process Document",
             use_container_width=True
         ):
 
-            progress = st.progress(0)
+            file_path = (
+                PDF_DIR /
+                uploaded_file.name
+            )
 
-            for index, uploaded_file in enumerate(
-                uploaded_files
-            ):
+            try:
 
-                file_path = (
-                    PDF_DIR /
-                    uploaded_file.name
+                with open(
+                    file_path,
+                    "wb"
+                ) as file:
+
+                    file.write(
+                        uploaded_file.getbuffer()
+                    )
+
+                chunks = index_pdf(
+                    file_path
                 )
 
-                try:
+                st.success(
+                    f"{uploaded_file.name}: "
+                    f"{chunks} chunks indexed"
+                )
 
-                    with open(
-                        file_path,
-                        "wb"
-                    ) as file:
+            except Exception as e:
 
-                        file.write(
-                            uploaded_file.getbuffer()
-                        )
-
-                    chunks = index_pdf(
-                        file_path
-                    )
-
-                    st.success(
-                        f"{uploaded_file.name}: "
-                        f"{chunks} chunks indexed"
-                    )
-
-                except Exception as e:
-
-                    st.error(
-                        f"{uploaded_file.name}: "
-                        f"{str(e)}"
-                    )
-
-                progress.progress(
-                    (index + 1)
-                    /
-                    len(uploaded_files)
+                st.error(
+                    f"{uploaded_file.name}: "
+                    f"{str(e)}"
                 )
 
     st.divider()
+
 
     # =====================================================
     # VECTOR DATABASE
@@ -117,6 +106,7 @@ with st.sidebar:
         "Indexed Chunks",
         get_collection_count()
     )
+
 
     # =====================================================
     # VIEW CHUNKS
@@ -246,8 +236,7 @@ if st.button(
     elif get_collection_count() == 0:
 
         st.warning(
-            "Please upload and process at least "
-            "one PDF document first."
+            "Please upload and process a PDF document first."
         )
 
     else:
@@ -263,6 +252,7 @@ if st.button(
                     top_k=top_k
                 )
 
+
                 # =========================================
                 # ANSWER
                 # =========================================
@@ -272,6 +262,7 @@ if st.button(
                 st.write(
                     result["answer"]
                 )
+
 
                 # =========================================
                 # SOURCES

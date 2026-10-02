@@ -24,7 +24,9 @@ STORAGE_DIR = (
     / "employee_rag_final"
 )
 
-PDF_DIR.mkdir(exist_ok=True)
+PDF_DIR.mkdir(
+    exist_ok=True
+)
 
 STORAGE_DIR.mkdir(
     parents=True,
@@ -67,7 +69,8 @@ text_splitter = RecursiveCharacterTextSplitter(
 # =========================================================
 
 llm = OllamaLLM(
-    model="llama3.2:latest"
+    model="llama3.2:latest",
+    temperature=0
 )
 
 
@@ -96,9 +99,11 @@ Rules:
 I don't know based on the provided documents.
 
 Context:
+
 {context}
 
 Question:
+
 {question}
 
 Answer:
@@ -157,18 +162,11 @@ def extract_employee_records(text):
         start = match.start()
 
         if i + 1 < len(matches):
-
-            end = matches[
-                i + 1
-            ].start()
-
+            end = matches[i + 1].start()
         else:
-
             end = len(text)
 
-        record = text[
-            start:end
-        ].strip()
+        record = text[start:end].strip()
 
         if record:
 
@@ -194,18 +192,46 @@ def get_page_number_from_position(
     for page_number, start, end in page_ranges:
 
         if start <= position < end:
-
             return page_number
 
     if page_ranges:
-
         return page_ranges[-1][0]
 
     return 1
 
 
 # =========================================================
-# 10. INDEX PDF
+# 10. CLEAR OLD DOCUMENTS
+# =========================================================
+
+def clear_vectorstore():
+
+    try:
+
+        existing = vectorstore.get()
+
+        old_ids = existing.get(
+            "ids",
+            []
+        ) or []
+
+        if old_ids:
+
+            vectorstore.delete(
+                ids=old_ids
+            )
+
+        return True
+
+    except Exception as e:
+
+        raise RuntimeError(
+            f"Could not clear old document data: {str(e)}"
+        )
+
+
+# =========================================================
+# 11. INDEX PDF
 # =========================================================
 
 def index_pdf(pdf_path):
@@ -262,7 +288,6 @@ def index_pdf(pdf_path):
     )
 
     if not full_text.strip():
-
         return 0
 
     has_employee_data = bool(
@@ -389,38 +414,17 @@ def index_pdf(pdf_path):
                 )
 
     if not chunks:
-
         return 0
 
     # =====================================================
-    # DELETE OLD PDF
+    # IMPORTANT:
+    # REMOVE ALL OLD PDF CHUNKS
     # =====================================================
 
-    try:
-
-        existing = vectorstore.get(
-            where={
-                "source": pdf_path.name
-            }
-        )
-
-        old_ids = existing.get(
-            "ids",
-            []
-        )
-
-        if old_ids:
-
-            vectorstore.delete(
-                ids=old_ids
-            )
-
-    except Exception:
-
-        pass
+    clear_vectorstore()
 
     # =====================================================
-    # ADD NEW PDF
+    # ADD ONLY CURRENT PDF
     # =====================================================
 
     vectorstore.add_texts(
@@ -433,7 +437,7 @@ def index_pdf(pdf_path):
 
 
 # =========================================================
-# 11. COLLECTION COUNT
+# 12. COLLECTION COUNT
 # =========================================================
 
 def get_collection_count():
@@ -442,7 +446,7 @@ def get_collection_count():
 
 
 # =========================================================
-# 12. GET ALL EMPLOYEE RECORDS
+# 13. GET ALL EMPLOYEE RECORDS
 # =========================================================
 
 def get_all_employee_records():
@@ -477,7 +481,7 @@ def get_all_employee_records():
 
 
 # =========================================================
-# 13. GET EMPLOYEE BY ID
+# 14. GET EMPLOYEE BY ID
 # =========================================================
 
 def get_employee_by_id(emp_id):
@@ -520,13 +524,12 @@ def get_employee_by_id(emp_id):
 
 
 # =========================================================
-# 14. PARSE EMPLOYEE RECORD
+# 15. PARSE EMPLOYEE RECORD
 # =========================================================
 
 def parse_employee_record(record):
 
     if not record:
-
         return None
 
     record = normalize_text(
@@ -544,7 +547,6 @@ def parse_employee_record(record):
     )
 
     if not emp_match:
-
         return None
 
     emp_id = (
@@ -562,12 +564,11 @@ def parse_employee_record(record):
     # -----------------------------------------------------
 
     email_match = re.search(
-        r"[\w.+-]+@[\w.-]+\.\w+",
+        r"[\w.+-]+@[\w\.-]+\.\w+",
         remaining
     )
 
     if not email_match:
-
         return None
 
     email = (
@@ -594,12 +595,11 @@ def parse_employee_record(record):
     # -----------------------------------------------------
 
     phone_match = re.search(
-        r"(?:\+91[- ]?)?\d{10}",
+        r"(?:\+1[- ]?)?\d{10}",
         after_email
     )
 
     if not phone_match:
-
         return None
 
     phone = (
@@ -624,7 +624,6 @@ def parse_employee_record(record):
     )
 
     if not date_match:
-
         return None
 
     hire_date = (
@@ -649,7 +648,6 @@ def parse_employee_record(record):
     )
 
     if not salary_match:
-
         return None
 
     salary = (
@@ -700,7 +698,6 @@ def parse_employee_record(record):
             break
 
     if not location:
-
         return None
 
     after_location = (
@@ -780,7 +777,6 @@ def parse_employee_record(record):
             break
 
     if not department:
-
         return None
 
     # -----------------------------------------------------
@@ -836,55 +832,107 @@ def parse_employee_record(record):
 
 
 # =========================================================
-# 15. DETECT FIELD
+# 16. DETECT FIELD
 # =========================================================
 
 def detect_field(question):
 
     q = question.lower()
 
-    if "salary" in q:
+    # Salary
+    if (
+        "salary" in q
+        or "pay" in q
+        or "earn" in q
+        or "earning" in q
+        or "income" in q
+        or "ctc" in q
+        or "compensation" in q
+    ):
         return "salary"
 
-    if "manager" in q:
+    # Manager
+    if (
+        "manager" in q
+        or "reports to" in q
+        or "reporting to" in q
+        or "supervisor" in q
+        or "boss" in q
+    ):
         return "manager"
 
-    if "department" in q:
+    # Department
+    if (
+        "department" in q
+        or "team" in q
+        or "division" in q
+    ):
         return "department"
 
-    if "position" in q:
+    # Position
+    if (
+        "position" in q
+        or "role" in q
+        or "job title" in q
+        or "designation" in q
+        or "job" in q
+    ):
         return "position"
 
+    # Location
     if (
         "location" in q
         or "located" in q
+        or "where" in q
+        or "city" in q
     ):
         return "location"
 
-    if "status" in q:
+    # Status
+    if (
+        "status" in q
+        or "active" in q
+        or "on leave" in q
+    ):
         return "status"
 
+    # Hire date
     if (
         "hire date" in q
         or "joining date" in q
         or "joined" in q
+        or "hired" in q
+        or "joining" in q
     ):
         return "hire_date"
 
-    if "email" in q:
+    # Email
+    if (
+        "email" in q
+        or "mail" in q
+    ):
         return "email"
 
-    if "phone" in q:
+    # Phone
+    if (
+        "phone" in q
+        or "mobile" in q
+        or "contact number" in q
+        or "number" in q
+    ):
         return "phone"
 
-    if "name" in q:
+    # Name
+    if (
+        "name" in q
+    ):
         return "name"
 
     return None
 
 
 # =========================================================
-# 16. EXACT EMPLOYEE QUESTION
+# 17. EXACT EMPLOYEE QUESTION
 # =========================================================
 
 def answer_employee_id_question(
@@ -898,7 +946,6 @@ def answer_employee_id_question(
     )
 
     if not emp_match:
-
         return None
 
     emp_id = (
@@ -914,7 +961,6 @@ def answer_employee_id_question(
     )
 
     if not employee:
-
         return None
 
     parsed = parse_employee_record(
@@ -922,7 +968,6 @@ def answer_employee_id_question(
     )
 
     if not parsed:
-
         return None
 
     field = detect_field(
@@ -949,6 +994,7 @@ def answer_employee_id_question(
                     f"The {field_name} "
                     f"of {parsed['emp_id']} "
                     f"is {value}.",
+
                 "sources": [
                     {
                         "file":
@@ -956,6 +1002,7 @@ def answer_employee_id_question(
                                 "source",
                                 "Unknown"
                             ),
+
                         "page":
                             employee["metadata"].get(
                                 "page",
@@ -969,7 +1016,7 @@ def answer_employee_id_question(
 
 
 # =========================================================
-# 17. EXTRACT FILTER CONDITIONS
+# 18. EXTRACT FILTER CONDITIONS
 # =========================================================
 
 def extract_conditions(question):
@@ -1071,7 +1118,7 @@ def extract_conditions(question):
 
 
 # =========================================================
-# 18. RECORD MATCH
+# 19. RECORD MATCH
 # =========================================================
 
 def record_matches(
@@ -1107,7 +1154,7 @@ def record_matches(
 
 
 # =========================================================
-# 19. FILTER EMPLOYEES
+# 20. FILTER EMPLOYEES
 # =========================================================
 
 def filter_employees(question):
@@ -1119,7 +1166,6 @@ def filter_employees(question):
     )
 
     if not conditions:
-
         return []
 
     records = (
@@ -1135,7 +1181,6 @@ def filter_employees(question):
         )
 
         if not parsed:
-
             continue
 
         if record_matches(
@@ -1154,7 +1199,7 @@ def filter_employees(question):
 
 
 # =========================================================
-# 20. COUNT QUESTION
+# 21. COUNT QUESTION
 # =========================================================
 
 def is_count_question(question):
@@ -1173,7 +1218,7 @@ def is_count_question(question):
 
 
 # =========================================================
-# 21. ANSWER FILTER QUESTION
+# 22. ANSWER FILTER QUESTION
 # =========================================================
 
 def answer_filter_question(
@@ -1213,7 +1258,9 @@ def answer_filter_question(
                 }
             )
 
-            seen.add(key)
+            seen.add(
+                key
+            )
 
     count = len(matches)
 
@@ -1228,6 +1275,7 @@ def answer_filter_question(
         return {
             "answer":
                 f"There are {count} employees matching the provided conditions.",
+
             "sources": sources
         }
 
@@ -1254,12 +1302,13 @@ def answer_filter_question(
         "answer":
             "The matching employees are:\n\n"
             + "\n".join(lines),
+
         "sources": sources
     }
 
 
 # =========================================================
-# 22. MAIN ASK QUESTION
+# 23. MAIN ASK QUESTION
 # =========================================================
 
 def ask_question(
@@ -1274,6 +1323,7 @@ def ask_question(
         return {
             "answer":
                 "Please enter a question.",
+
             "sources": []
         }
 
@@ -1288,7 +1338,6 @@ def ask_question(
     )
 
     if exact_answer:
-
         return exact_answer
 
     # =====================================================
@@ -1317,6 +1366,7 @@ def ask_question(
         return {
             "answer":
                 "I don't know based on the provided documents.",
+
             "sources": []
         }
 
@@ -1336,6 +1386,7 @@ def ask_question(
         return {
             "answer":
                 "I don't know based on the provided documents.",
+
             "sources": []
         }
 
